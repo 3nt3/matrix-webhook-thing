@@ -91,6 +91,11 @@ async fn main() -> std::io::Result<()> {
         .await
 }
 
+#[get("/")]
+async fn hello() -> impl actix_web::Responder {
+    "Hello, world!"
+}
+
 #[post("/git/new-commit")]
 async fn new_commit(payload: Json<PushPayload>) -> impl actix_web::Responder {
     info!("New commit endpoint hit");
