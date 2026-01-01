@@ -1,4 +1,5 @@
-use actix_web::{App, HttpServer, get};
+use actix_web::{App, HttpServer, get, post, web::Json};
+use anyhow::anyhow;
 use log::{debug, info};
 use matrix_sdk::{
     Client, ServerName,
@@ -11,6 +12,31 @@ use matrix_sdk::{
         user_id,
     },
 };
+
+#[derive(serde::Deserialize)]
+struct PushPayload {
+    repository: String,
+    sender: String,
+    commits: Vec<Commit>,
+}
+
+#[derive(serde::Deserialize)]
+struct Commit {
+    author: String,
+    url: String,
+    message: String,
+}
+
+#[derive(serde::Deserialize)]
+struct Config {
+    repos: Vec<Repo>,
+}
+
+#[derive(serde::Deserialize)]
+struct Repo {
+    id: String,
+    room: String,
+}
 
 static MATRIX_CLIENT: once_cell::sync::OnceCell<Client> = once_cell::sync::OnceCell::new();
 
@@ -53,8 +79,8 @@ async fn main() -> std::io::Result<()> {
         .await
 }
 
-#[get("/new-commit")]
-async fn new_commit() -> impl actix_web::Responder {
+#[post("/git/new-commit")]
+async fn new_commit(payload: Json<PushPayload>) -> impl actix_web::Responder {
     info!("New commit endpoint hit");
 
     let client = MATRIX_CLIENT.get().unwrap();
@@ -66,10 +92,43 @@ async fn new_commit() -> impl actix_web::Responder {
 
     debug!("Sending message to room {}", room_id);
 
-    let room = client.get_room(&room_id).expect("Room not found");
+    let room_for_repo =
+        get_room_for_repo(&payload.repository).expect("Failed to get room for repo");
+    let room_id = RoomId::parse(room_for_repo).expect("Invalid room ID");
+    let room = client.get_room(&room_id).expect("Failed to get room");
 
-    let msg = RoomMessageEventContent::text_plain("New commit pushed to repository!");
+    let msg = RoomMessageEventContent::text_html(
+        format!(
+            "New commit by {}: \"{}\" ",
+            payload.sender, payload.commits[0].message
+        ),
+        format!(
+            "<a href=\"{}\">New commit by {}: <i>{}</i></a><br><blockquote>{}</blockquote>",
+            payload.commits[0].url,
+            payload.sender,
+            payload.commits[0]
+                .message
+                .lines()
+                .next()
+                .unwrap_or("No commit message"),
+            payload.commits[0].message,
+        ),
+    );
     room.send(msg).await.unwrap();
 
     "New commit received"
+}
+
+fn get_room_for_repo(repo: &str) -> anyhow::Result<String> {
+    let toml_str = std::fs::read_to_string("config.toml")?;
+    let config: Config = toml::from_str(&toml_str)?;
+
+    let room = &config
+        .repos
+        .iter()
+        .find(|x| x.id == repo.to_string())
+        .ok_or_else(|| anyhow!("Room not configured"))?
+        .room;
+
+    Ok(room.to_string())
 }
