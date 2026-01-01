@@ -15,16 +15,28 @@ use matrix_sdk::{
 
 #[derive(serde::Deserialize)]
 struct PushPayload {
-    repository: String,
+    repository: Repository,
     sender: String,
     commits: Vec<Commit>,
 }
 
 #[derive(serde::Deserialize)]
+struct Repository {
+    full_name: String,
+}
+
+#[derive(serde::Deserialize)]
 struct Commit {
-    author: String,
+    author: Author,
     url: String,
     message: String,
+}
+
+#[derive(serde::Deserialize)]
+struct Author {
+    name: String,
+    email: String,
+    username: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -85,15 +97,12 @@ async fn new_commit(payload: Json<PushPayload>) -> impl actix_web::Responder {
 
     let client = MATRIX_CLIENT.get().unwrap();
 
-    let room_id = RoomId::parse(
-        std::env::var("MATRIX_ROOM_ID").unwrap_or_else(|_| "!open-vaporphase:3nt3.de".to_string()),
-    )
-    .unwrap();
+    let room_id = RoomId::parse(std::env::var("MATRIX_ROOM_ID").unwrap()).unwrap();
 
     debug!("Sending message to room {}", room_id);
 
     let room_for_repo =
-        get_room_for_repo(&payload.repository).expect("Failed to get room for repo");
+        get_room_for_repo(&payload.repository.full_name).expect("Failed to get room for repo");
     let room_id = RoomId::parse(room_for_repo).expect("Invalid room ID");
     let room = client.get_room(&room_id).expect("Failed to get room");
 
