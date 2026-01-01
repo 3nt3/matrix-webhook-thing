@@ -86,7 +86,7 @@ async fn main() -> std::io::Result<()> {
     info!("Logged in as {}", beepboop);
 
     HttpServer::new(|| App::new().service(new_commit).service(hello))
-        .bind(("127.0.0.1", 1337))?
+        .bind(("0.0.0.0", 1337))?
         .run()
         .await
 }
