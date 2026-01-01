@@ -22,6 +22,8 @@ FROM debian:bookworm-slim
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    libsqlite3-dev \
+    libssl-dev \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/matrix-webhook-thing /usr/local/bin/app
