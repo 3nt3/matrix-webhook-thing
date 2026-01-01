@@ -1,6 +1,7 @@
 services:
   app:
-    build: .
+    # build: .
+    image: ghcr.io/3nt3/matrix-webhook-thing:latest
     ports:
       - "127.0.0.1:8080:1337"
     restart: always
