@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    ports:
+      - 1337:8080
+    restart: always
+
