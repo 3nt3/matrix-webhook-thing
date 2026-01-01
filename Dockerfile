@@ -5,6 +5,7 @@ FROM rust:1.92-slim as builder
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    libsqlite3-dev \
     ca-certificates \
     build-essential \
  && rm -rf /var/lib/apt/lists/*
