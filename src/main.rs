@@ -21,6 +21,12 @@ struct PushPayload {
 }
 
 #[derive(serde::Deserialize)]
+struct Sender {
+    login: String,
+    html_url: String,
+}
+
+#[derive(serde::Deserialize)]
 struct Repository {
     full_name: String,
 }
