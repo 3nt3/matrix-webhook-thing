@@ -134,15 +134,8 @@ async fn new_commit(payload: Json<GithubWebhook>) -> impl actix_web::Responder {
             users, payload.commits[0].message
         ),
         format!(
-            "<a href=\"{}\">New commit by {}: <i>{}</i></a><br><blockquote>{}</blockquote>",
-            payload.commits[0].url,
-            users,
-            payload.commits[0]
-                .message
-                .lines()
-                .next()
-                .unwrap_or("No commit message"),
-            payload.commits[0].message,
+            "<a href=\"{}\">New commit by {}</a><br><blockquote>{}</blockquote>",
+            payload.commits[0].url, users, payload.commits[0].message,
         ),
     );
     room.send(msg).await.unwrap();
