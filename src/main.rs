@@ -12,37 +12,40 @@ use matrix_sdk::{
         user_id,
     },
 };
+use serde::{self, Deserialize};
 
-#[derive(serde::Deserialize)]
-struct PushPayload {
-    repository: Repository,
-    sender: String,
-    commits: Vec<Commit>,
+#[derive(Debug, Deserialize)]
+pub struct GithubWebhook {
+    #[serde(rename = "ref")]
+    pub git_ref: String,
+    pub before: String,
+    pub after: String,
+    pub repository: Repository,
+    pub commits: Vec<Commit>,
+    pub head_commit: Commit,
 }
 
-#[derive(serde::Deserialize)]
-struct Sender {
-    login: String,
-    html_url: String,
+#[derive(Debug, Deserialize)]
+pub struct Repository {
+    pub name: String,
+    pub full_name: String,
+    pub html_url: String,
 }
 
-#[derive(serde::Deserialize)]
-struct Repository {
-    full_name: String,
+#[derive(Debug, Deserialize)]
+pub struct Commit {
+    pub id: String,
+    pub message: String,
+    pub timestamp: String,
+    pub url: String,
+    pub author: CommitUser,
 }
 
-#[derive(serde::Deserialize)]
-struct Commit {
-    author: Author,
-    url: String,
-    message: String,
-}
-
-#[derive(serde::Deserialize)]
-struct Author {
-    name: String,
-    email: String,
-    username: String,
+#[derive(Debug, Deserialize)]
+pub struct CommitUser {
+    pub name: String,
+    pub email: String,
+    pub username: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -103,7 +106,7 @@ async fn hello() -> impl actix_web::Responder {
 }
 
 #[post("/git/new-commit")]
-async fn new_commit(payload: Json<PushPayload>) -> impl actix_web::Responder {
+async fn new_commit(payload: Json<GithubWebhook>) -> impl actix_web::Responder {
     info!("New commit endpoint hit");
 
     let client = MATRIX_CLIENT.get().unwrap();
@@ -117,15 +120,23 @@ async fn new_commit(payload: Json<PushPayload>) -> impl actix_web::Responder {
     let room_id = RoomId::parse(room_for_repo).expect("Invalid room ID");
     let room = client.get_room(&room_id).expect("Failed to get room");
 
+    let users = format_list(
+        payload
+            .commits
+            .iter()
+            .map(|c| c.author.username.clone().unwrap_or(c.author.name.clone()))
+            .collect::<Vec<String>>(),
+    );
+
     let msg = RoomMessageEventContent::text_html(
         format!(
             "New commit by {}: \"{}\" ",
-            payload.sender, payload.commits[0].message
+            users, payload.commits[0].message
         ),
         format!(
             "<a href=\"{}\">New commit by {}: <i>{}</i></a><br><blockquote>{}</blockquote>",
             payload.commits[0].url,
-            payload.sender,
+            users,
             payload.commits[0]
                 .message
                 .lines()
@@ -151,4 +162,17 @@ fn get_room_for_repo(repo: &str) -> anyhow::Result<String> {
         .room;
 
     Ok(room.to_string())
+}
+
+fn format_list(items: Vec<String>) -> String {
+    match items.len() {
+        0 => String::new(),
+        1 => items[0].clone(),
+        2 => format!("{} and {}", items[0], items[1]),
+        _ => {
+            let last = items.last().unwrap();
+            let rest = &items[..items.len() - 1];
+            format!("{}, and {}", rest.join(", "), last)
+        }
+    }
 }
